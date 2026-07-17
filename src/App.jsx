@@ -1,3 +1,7 @@
+import { lazy, Suspense } from 'react'
+
+const Guestbook = lazy(() => import('./Guestbook.jsx'))
+
 const GITHUB_URL = 'https://github.com/SsSsSsjj'
 
 function ArrowIcon() {
@@ -19,6 +23,7 @@ function App() {
             <a href="#about">소개</a>
             <a href="#now">요즘</a>
             <a href="#rhythm">리듬</a>
+            <a href="#guestbook">방명록</a>
           </div>
           <a className="nav-cta" href={GITHUB_URL} target="_blank" rel="noreferrer">
             GitHub <ArrowIcon />
@@ -102,8 +107,12 @@ function App() {
           </div>
         </section>
 
+        <Suspense fallback={<section className="guestbook-loading" aria-live="polite">방명록을 준비하는 중…</section>}>
+          <Guestbook />
+        </Suspense>
+
         <section className="contact container" id="contact" aria-labelledby="contact-title">
-          <p className="section-index">05 · CONTACT</p>
+          <p className="section-index">06 · CONTACT</p>
           <h2 id="contact-title">다음 생각은<br />여기에서 이어집니다.</h2>
           <a className="button button-contact" href={GITHUB_URL} target="_blank" rel="noreferrer">
             SsSsSsjj <ArrowIcon />
