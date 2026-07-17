@@ -1,5 +1,6 @@
 import { initializeApp } from 'firebase/app'
 import { getAnalytics, isSupported } from 'firebase/analytics'
+import { getAuth, GoogleAuthProvider } from 'firebase/auth'
 
 const firebaseConfig = {
   apiKey: 'AIzaSyDn2Kk8y5G_u-wpJNlkrBx3gqBj6GP8AXA',
@@ -12,6 +13,10 @@ const firebaseConfig = {
 }
 
 const firebaseApp = initializeApp(firebaseConfig)
+const auth = getAuth(firebaseApp)
+const googleProvider = new GoogleAuthProvider()
+
+googleProvider.setCustomParameters({ prompt: 'select_account' })
 
 isSupported()
   .then((supported) => {
@@ -21,4 +26,4 @@ isSupported()
     // Analytics is optional and can be unavailable in restricted browsers.
   })
 
-export { firebaseApp }
+export { auth, firebaseApp, googleProvider }
