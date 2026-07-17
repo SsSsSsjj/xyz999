@@ -3,7 +3,7 @@ import { getAnalytics, isSupported } from 'firebase/analytics'
 import { getAuth, GoogleAuthProvider } from 'firebase/auth'
 
 const firebaseConfig = {
-  apiKey: 'AIzaSyDn2Kk8y5G_u-wpJNlkrBx3gqBj6GP8AXA',
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
   authDomain: 'xyz999-43513.firebaseapp.com',
   projectId: 'xyz999-43513',
   storageBucket: 'xyz999-43513.firebasestorage.app',

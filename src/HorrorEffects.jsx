@@ -164,23 +164,83 @@ function Watcher({ visible }) {
   return <span className="watcher-dot" ref={watcherRef} aria-hidden="true" />
 }
 
-function apparitionStage(elapsed) {
-  if (elapsed >= 1.5 && elapsed < 4.5) return 1
-  if (elapsed >= 7 && elapsed < 10.5) return 2
-  if (elapsed >= 14 && elapsed < 17.5) return 3
-  if (elapsed >= 22 && elapsed < 25.5) return 4
-  if (elapsed >= 31 && elapsed < 35) return 5
-  if (elapsed >= 38) return 6
-  return 0
+const HANDPRINT_ASSETS = [
+  ...Array.from({ length: 9 }, (_, index) => ({
+    src: '/images/bloody-handprints-sprite.png',
+    columns: 3,
+    rows: 3,
+    cell: index,
+  })),
+  ...Array.from({ length: 8 }, (_, index) => ({
+    src: '/images/bloody-handprints-sprite-8.png',
+    columns: 4,
+    rows: 2,
+    cell: index,
+  })),
+]
+
+const HANDPRINT_PLACEMENTS = [
+  [1.1, 5, 7, 210, -18, 92], [3.35, 67, 4, 176, 13, 58], [5.6, 36, 13, 245, -7, 110],
+  [7.85, 78, 27, 220, 25, 86], [10.1, 9, 34, 188, 8, 76], [12.35, 52, 38, 270, -22, 125],
+  [14.6, 27, 48, 215, 17, 68], [16.85, 72, 53, 235, -11, 118], [19.1, -3, 66, 255, 28, 98],
+  [21.35, 42, 69, 205, 6, 72], [23.6, 82, 72, 190, -29, 105], [25.85, 17, 79, 230, -8, 115],
+  [28.1, 61, 82, 265, 19, 92], [30.35, 88, 2, 172, -15, 78], [32.6, 0, 20, 195, 31, 88],
+  [34.85, 39, -5, 228, 11, 103], [37.1, 69, 68, 280, -19, 140],
+]
+
+const FLOOD_PLACEMENTS = HANDPRINT_PLACEMENTS.map((placement, index) => [
+  38 + index * 0.32,
+  (placement[1] + 29 + index * 7) % 96 - 5,
+  (placement[2] + 23 + index * 11) % 94 - 4,
+  placement[3] * 1.08,
+  placement[4] * -1.25,
+  placement[5] * 1.35,
+])
+
+function Handprint({ asset, placement, index }) {
+  const [at, x, y, size, rotation, drip] = placement
+  const column = asset.cell % asset.columns
+  const row = Math.floor(asset.cell / asset.columns)
+  return (
+    <span
+      className="handprint-mark"
+      style={{
+        '--mark-x': `${x}%`, '--mark-y': `${y}%`, '--mark-size': `${size}px`,
+        '--mark-rotation': `${rotation}deg`, '--drip-length': `${drip}px`,
+        '--mark-delay': `${(index % 5) * 0.06}s`,
+      }}
+      data-appears-at={at}
+    >
+      <b aria-hidden="true">
+        <img
+          src={asset.src}
+          alt=""
+          style={{
+            width: `${asset.columns * 100}%`, height: `${asset.rows * 100}%`,
+            left: `${column * -100}%`, top: `${row * -100}%`,
+          }}
+        />
+      </b>
+      <i aria-hidden="true" />
+    </span>
+  )
 }
 
-function Apparition({ elapsed, isJumpScare }) {
-  const stage = isJumpScare ? 7 : apparitionStage(elapsed)
-  if (!stage) return null
+function HandprintSwarm({ elapsed, isJumpScare }) {
+  const placements = [...HANDPRINT_PLACEMENTS, ...FLOOD_PLACEMENTS]
+  const visible = placements.filter(([at]) => isJumpScare || elapsed >= at)
+  if (!visible.length) return null
 
   return (
-    <div className={`apparition-layer apparition-stage-${stage}`} aria-hidden="true">
-      <img src="/images/corridor-apparition.png" alt="" />
+    <div className={`handprint-swarm${isJumpScare ? ' handprint-flood' : ''}`} aria-hidden="true">
+      {visible.map((placement, index) => (
+        <Handprint
+          key={`${index}-${placement[0]}`}
+          asset={HANDPRINT_ASSETS[index % HANDPRINT_ASSETS.length]}
+          placement={placement}
+          index={index}
+        />
+      ))}
     </div>
   )
 }
@@ -201,6 +261,7 @@ function Soundscape({ active, consumed, jumpScare }) {
   const contextRef = useRef(null)
   const ambienceRef = useRef(null)
   const jumpPlayedRef = useRef(false)
+  const activationPlayedRef = useRef(false)
   const [enabled, setEnabled] = useState(false)
   const [muted, setMuted] = useState(false)
 
@@ -211,6 +272,22 @@ function Soundscape({ active, consumed, jumpScare }) {
       contextRef.current = new AudioContext()
     }
     if (contextRef.current.state === 'suspended') contextRef.current.resume()
+    if (!activationPlayedRef.current) {
+      activationPlayedRef.current = true
+      const context = contextRef.current
+      const now = context.currentTime
+      const oscillator = context.createOscillator()
+      const gain = context.createGain()
+      oscillator.type = 'triangle'
+      oscillator.frequency.setValueAtTime(246.9, now)
+      oscillator.frequency.exponentialRampToValueAtTime(110, now + 0.72)
+      gain.gain.setValueAtTime(0.0001, now)
+      gain.gain.exponentialRampToValueAtTime(0.14, now + 0.035)
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.74)
+      oscillator.connect(gain).connect(context.destination)
+      oscillator.start(now)
+      oscillator.stop(now + 0.76)
+    }
     setEnabled(true)
     return contextRef.current
   }
@@ -257,19 +334,19 @@ function Soundscape({ active, consumed, jumpScare }) {
     const master = context.createGain()
     const filter = context.createBiquadFilter()
     master.gain.setValueAtTime(0.0001, now)
-    master.gain.exponentialRampToValueAtTime(mode === 'ruins' ? 0.07 : 0.14, now + 1.4)
+    master.gain.exponentialRampToValueAtTime(mode === 'ruins' ? 0.12 : 0.22, now + 1.4)
     filter.type = 'lowpass'
-    filter.frequency.value = mode === 'ruins' ? 520 : 310
+    filter.frequency.value = mode === 'ruins' ? 1100 : 1500
     master.connect(filter).connect(context.destination)
 
-    const frequencies = mode === 'ruins' ? [82.4, 123.5, 164.8] : [43.2, 46.1, 87.4]
+    const frequencies = mode === 'ruins' ? [98, 146.8, 196] : [110, 146.8, 174.6, 220]
     const sources = frequencies.map((frequency, index) => {
       const oscillator = context.createOscillator()
       const gain = context.createGain()
-      oscillator.type = index === 2 ? 'triangle' : 'sine'
+      oscillator.type = index % 3 === 2 ? 'triangle' : 'sine'
       oscillator.frequency.value = frequency
       oscillator.detune.value = index * 4 - 3
-      gain.gain.value = mode === 'ruins' ? 0.22 : 0.3
+      gain.gain.value = mode === 'ruins' ? 0.24 : 0.32
       oscillator.connect(gain).connect(master)
       oscillator.start()
       return oscillator
@@ -279,7 +356,7 @@ function Soundscape({ active, consumed, jumpScare }) {
     const noiseGain = context.createGain()
     noise.buffer = createNoiseBuffer(context)
     noise.loop = true
-    noiseGain.gain.value = mode === 'ruins' ? 0.08 : 0.18
+    noiseGain.gain.value = mode === 'ruins' ? 0.13 : 0.22
     noise.connect(noiseGain).connect(master)
     noise.start()
     sources.push(noise)
@@ -297,10 +374,10 @@ function Soundscape({ active, consumed, jumpScare }) {
     const now = context.currentTime
     const master = context.createGain()
     const compressor = context.createDynamicsCompressor()
-    compressor.threshold.value = -12
-    compressor.ratio.value = 12
+    compressor.threshold.value = -16
+    compressor.ratio.value = 16
     master.gain.setValueAtTime(0.0001, now)
-    master.gain.exponentialRampToValueAtTime(0.24, now + 0.025)
+    master.gain.exponentialRampToValueAtTime(0.38, now + 0.025)
     master.gain.exponentialRampToValueAtTime(0.0001, now + 1.15)
     master.connect(compressor).connect(context.destination)
 
@@ -373,10 +450,11 @@ export function HorrorOverlay({ hauntingActive, isConsumed, isJumpScare, isPosse
     <>
       <div className="noise-layer" aria-hidden="true" />
       <div className="scanline-layer" aria-hidden="true" />
-      <img className="apparition-preload" src="/images/corridor-apparition.png" alt="" aria-hidden="true" />
+      <img className="handprint-preload" src="/images/bloody-handprints-sprite.png" alt="" aria-hidden="true" />
+      <img className="handprint-preload" src="/images/bloody-handprints-sprite-8.png" alt="" aria-hidden="true" />
       <Watcher visible={hauntingActive && !isConsumed} />
       <Soundscape active={isPossessed} consumed={isConsumed} jumpScare={isJumpScare} />
-      {(isPossessed || isJumpScare) && <Apparition elapsed={possessionElapsed} isJumpScare={isJumpScare} />}
+      {(isPossessed || isJumpScare) && <HandprintSwarm elapsed={possessionElapsed} isJumpScare={isJumpScare} />}
       {isPossessed && !isConsumed && (
         <>
           <div className="phrase-swarm" aria-hidden="true">
